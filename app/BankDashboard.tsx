@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 
 type Transaction = {
   id: string;
@@ -9,6 +9,22 @@ type Transaction = {
   date: string;
   amount: number;
   icon: string;
+};
+
+type ApiAccount = {
+  id: string;
+  account_number: string;
+  account_type: string;
+  currency: string;
+  balance_cents: number;
+};
+
+type ApiTransfer = {
+  id: string;
+  source_account_id: string;
+  amount_cents: number;
+  description: string;
+  created_at: string;
 };
 
 const seedTransactions: Transaction[] = [
@@ -26,29 +42,79 @@ export function BankDashboard() {
   const [showTransfer, setShowTransfer] = useState(false);
   const [notice, setNotice] = useState("");
   const [filter, setFilter] = useState("");
+  const [accounts, setAccounts] = useState<ApiAccount[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadDashboard() {
+      try {
+        const accountResponse = await fetch("/api/accounts", { cache: "no-store" });
+        if (!accountResponse.ok) throw new Error("Account service unavailable");
+        const loadedAccounts = (await accountResponse.json()) as ApiAccount[];
+        setAccounts(loadedAccounts);
+        const checking = loadedAccounts.find((account) => account.account_type === "checking");
+        if (!checking) throw new Error("No checking account found");
+        setBalance(checking.balance_cents / 100);
+        const transferResponse = await fetch(`/api/transfers?account_id=${checking.id}`);
+        if (transferResponse.ok) {
+          const loaded = (await transferResponse.json()) as ApiTransfer[];
+          setTransactions(loaded.map((transfer) => ({
+            id: transfer.id.slice(0, 13).toUpperCase(),
+            title: transfer.description,
+            category: "Transfer",
+            date: new Date(transfer.created_at).toLocaleString(),
+            amount: transfer.source_account_id === checking.id ? -(transfer.amount_cents / 100) : transfer.amount_cents / 100,
+            icon: "NS",
+          })));
+        }
+      } catch {
+        setNotice("Live banking data is unavailable. Displaying synthetic preview data.");
+      } finally {
+        setLoading(false);
+      }
+    }
+    void loadDashboard();
+  }, []);
 
   const filtered = useMemo(
     () => transactions.filter((item) => `${item.title} ${item.category} ${item.id}`.toLowerCase().includes(filter.toLowerCase())),
     [filter, transactions],
   );
 
-  function submitTransfer(event: FormEvent<HTMLFormElement>) {
+  async function submitTransfer(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
-    const recipient = String(data.get("recipient") || "").trim();
+    const destinationAccountId = String(data.get("destination_account_id") || "").trim();
     const amount = Number(data.get("amount"));
-    if (!recipient || !Number.isFinite(amount) || amount <= 0 || amount > balance) return;
+    const source = accounts.find((account) => account.account_type === "checking");
+    if (!source || !destinationAccountId || !Number.isFinite(amount) || amount <= 0) return;
+    const response = await fetch("/api/transfers", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() },
+      body: JSON.stringify({
+        source_account_id: source.id,
+        destination_account_id: destinationAccountId,
+        amount,
+        currency: source.currency,
+        description: "Northstar account transfer",
+      }),
+    });
+    if (!response.ok) {
+      const error = (await response.json()) as { detail?: string; error?: string };
+      setNotice(error.detail ?? error.error ?? "Transfer could not be completed.");
+      return;
+    }
     setBalance((value) => value - amount);
     setTransactions((items) => [{
-      id: `TXN-${Math.floor(10000 + Math.random() * 89999)}`,
-      title: recipient,
+      id: `TXN-${Date.now().toString().slice(-5)}`,
+      title: "Northstar account transfer",
       category: "Transfer",
       date: "Just now",
       amount: -amount,
-      icon: recipient.slice(0, 2).toUpperCase(),
+      icon: "NS",
     }, ...items]);
     setShowTransfer(false);
-    setNotice(`${money.format(amount)} transfer scheduled for ${recipient}.`);
+    setNotice(`${money.format(amount)} transfer completed.`);
   }
 
   return (
@@ -81,7 +147,7 @@ export function BankDashboard() {
           <section className="balance-card" id="accounts">
             <div className="balance-head"><span>PRIMARY CHECKING</span><button aria-label="Account options">•••</button></div>
             <p className="account-number">•••• 4821</p>
-            <p className="balance-label">Available balance</p>
+            <p className="balance-label">{loading ? "Loading live balance…" : "Available balance"}</p>
             <p className="balance">{money.format(balance)}</p>
             <div className="balance-meta"><span><small>Current balance</small><b>{money.format(balance + 318.4)}</b></span><span><small>Pending</small><b>{money.format(318.4)}</b></span></div>
             <div className="balance-actions"><button onClick={() => setShowTransfer(true)}>⇧<span>Transfer</span></button><button>＋<span>Deposit</span></button><button>▦<span>Pay bill</span></button><button>•••<span>More</span></button></div>
@@ -110,7 +176,7 @@ export function BankDashboard() {
         </div>
       </section>
 
-      {showTransfer && <div className="modal-backdrop" role="presentation" onMouseDown={() => setShowTransfer(false)}><section className="modal" role="dialog" aria-modal="true" aria-labelledby="transfer-title" onMouseDown={(e) => e.stopPropagation()}><button className="close" onClick={() => setShowTransfer(false)} aria-label="Close">×</button><p className="eyebrow">SECURE TRANSFER</p><h2 id="transfer-title">Send money</h2><p>Move funds from your primary checking account.</p><form onSubmit={submitTransfer}><label>Recipient<input name="recipient" required placeholder="Name or account" autoFocus /></label><label>Amount<div className="amount-input"><span>$</span><input name="amount" required type="number" min="0.01" max={balance} step="0.01" placeholder="0.00" /></div></label><small>Available: {money.format(balance)}</small><button className="primary" type="submit">Review transfer →</button></form></section></div>}
+      {showTransfer && <div className="modal-backdrop" role="presentation" onMouseDown={() => setShowTransfer(false)}><section className="modal" role="dialog" aria-modal="true" aria-labelledby="transfer-title" onMouseDown={(e) => e.stopPropagation()}><button className="close" onClick={() => setShowTransfer(false)} aria-label="Close">×</button><p className="eyebrow">SECURE TRANSFER</p><h2 id="transfer-title">Send money</h2><p>Move funds from your primary checking account.</p><form onSubmit={submitTransfer}><label>Destination account<select name="destination_account_id" required autoFocus><option value="">Choose an account</option>{accounts.filter((account) => account.account_type !== "checking").map((account) => <option key={account.id} value={account.id}>{account.account_type} · •••• {account.account_number.slice(-4)}</option>)}</select></label><label>Amount<div className="amount-input"><span>$</span><input name="amount" required type="number" min="0.01" max={balance} step="0.01" placeholder="0.00" /></div></label><small>Available: {money.format(balance)}</small><button className="primary" type="submit">Review transfer →</button></form></section></div>}
     </main>
   );
 }

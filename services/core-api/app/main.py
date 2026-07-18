@@ -6,15 +6,23 @@ from typing import Annotated
 
 from fastapi import Depends, FastAPI, Header, Query, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import engine, get_db
 from app.logging_config import configure_logging
 from app.metrics import HTTP_DURATION, HTTP_REQUESTS
-from app.schemas import AccountResponse, HealthResponse, TransferCreate, TransferResponse
+from app.schemas import (
+    AccountResponse,
+    HealthResponse,
+    ReadinessFailureResponse,
+    TransferCreate,
+    TransferResponse,
+)
 from app.services import create_transfer, list_accounts, list_transfers
 
 configure_logging()
@@ -73,9 +81,26 @@ def liveness() -> HealthResponse:
     return HealthResponse(status="ok", service=settings.app_name, environment=settings.app_env)
 
 
-@app.get("/health/ready", response_model=HealthResponse, tags=["Operations"])
-def readiness(db: Annotated[Session, Depends(get_db)]) -> HealthResponse:
-    db.execute(text("SELECT 1"))
+@app.get(
+    "/health/ready",
+    response_model=HealthResponse,
+    responses={status.HTTP_503_SERVICE_UNAVAILABLE: {"model": ReadinessFailureResponse}},
+    tags=["Operations"],
+)
+def readiness(db: Annotated[Session, Depends(get_db)]) -> HealthResponse | Response:
+    try:
+        db.execute(text("SELECT 1"))
+    except SQLAlchemyError:
+        logger.warning("readiness_dependency_unavailable", extra={"dependency": "postgresql"})
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content={
+                "status": "not_ready",
+                "service": settings.app_name,
+                "environment": settings.app_env,
+                "dependency": "postgresql",
+            },
+        )
     return HealthResponse(status="ready", service=settings.app_name, environment=settings.app_env)
 
 

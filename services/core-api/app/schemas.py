@@ -53,3 +53,7 @@ class HealthResponse(BaseModel):
     status: str
     service: str
     environment: str
+
+
+class ReadinessFailureResponse(HealthResponse):
+    dependency: str

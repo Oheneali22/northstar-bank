@@ -1,0 +1,99 @@
+name: northstar-bank
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-northstar}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-northstar}
+      POSTGRES_DB: ${POSTGRES_DB:-northstar}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  migrate:
+    image: northstar-core-api:0.1.0
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-northstar}:${POSTGRES_PASSWORD:-northstar}@postgres:5432/${POSTGRES_DB:-northstar}
+      APP_ENV: local
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  seed:
+    image: northstar-core-api:0.1.0
+    command: ["python", "-m", "scripts.seed"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-northstar}:${POSTGRES_PASSWORD:-northstar}@postgres:5432/${POSTGRES_DB:-northstar}
+      APP_ENV: local
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: "no"
+
+  core-api:
+    image: northstar-core-api:0.1.0
+    build:
+      context: ./services/core-api
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-northstar}:${POSTGRES_PASSWORD:-northstar}@postgres:5432/${POSTGRES_DB:-northstar}
+      APP_ENV: local
+      LOG_LEVEL: INFO
+      CORS_ORIGINS: http://localhost:3000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      seed:
+        condition: service_completed_successfully
+    ports:
+      - "127.0.0.1:8000:8000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=2)",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  web:
+    image: northstar-web:0.1.0
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      CORE_API_URL: http://core-api:8000
+    depends_on:
+      core-api:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:3000:3000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/health/ready').then((response) => { if (!response.ok) process.exit(1) }).catch(() => process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  postgres-data:

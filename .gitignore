@@ -31,6 +31,8 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
+!**/.env.example
 
 # vercel
 .vercel
@@ -41,3 +43,11 @@ next-env.d.ts
 /.wrangler/
 /outputs/
 /work/
+
+# python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+*.egg-info/

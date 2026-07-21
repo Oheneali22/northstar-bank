@@ -1,62 +1,63 @@
 # Northstar Bank
 
-Northstar Bank is a production-minded learning application for practicing the full DevOps lifecycle: application delivery, containers, Kubernetes, AWS, infrastructure as code, observability, security, and incident response.
+Northstar Bank is a synthetic banking application designed as a realistic DevOps and
+observability portfolio environment. It contains a customer web application and a core banking
+API with PostgreSQL persistence, atomic transfers, a double-entry ledger, health probes,
+structured logs, metrics, tests, migrations, and OpenAPI documentation.
 
-> This project uses synthetic customers and fake money only. It is not financial software.
+> Northstar Bank uses fake customers and fake money. It is not financial software and must not
+> process real personal or payment data.
 
-## Current milestone: Sprint 1A
-
-The first vertical slice is a responsive customer dashboard with:
-
-- Checking-account balances and financial summary
-- Searchable transaction activity
-- Savings-goal and platform-health panels
-- An interactive money-transfer workflow
-- Server-rendered smoke tests and a production build
-
-The current transfer flow is intentionally a UI prototype. Persistent transactions, authentication, idempotency, and ledger rules arrive in Sprint 1B.
-
-## Run locally
-
-Requirements: Node.js 22+ and pnpm 11+.
-
-```bash
-pnpm install
-pnpm dev
-```
-
-Build and test:
-
-```bash
-pnpm build
-node --test tests/rendered-html.test.mjs
-```
-
-## Delivery roadmap
-
-1. **Application:** account, transaction, notification, and identity services with PostgreSQL and Redis.
-2. **Containers:** secure multi-stage images and Docker Compose development environment.
-3. **Kubernetes:** kind cluster, Helm, Kustomize, workloads, configuration, storage, RBAC, policies, autoscaling, and GitOps.
-4. **AWS:** Terraform-managed VPC, EKS, ECR, RDS, ElastiCache, S3, SQS, SNS, IAM, KMS, Secrets Manager, ALB, Route 53, and observability.
-5. **Operations:** CI/CD, SLOs, dashboards, alerts, backups, disaster recovery, security scanning, and incident exercises.
-
-## Repository direction
+## Components
 
 ```text
-app/             customer web application
-tests/           rendered application checks
-services/        backend services (Sprint 1B)
-deploy/docker/   local container environment (Sprint 2)
-deploy/helm/     Kubernetes packages (Sprint 3)
-infra/terraform/ AWS infrastructure (Sprint 4)
-docs/runbooks/   operational procedures and incidents
+Browser
+   |
+   v
+northstar-web :3000
+   |
+   v
+northstar-core-api :8000
+   |
+   v
+PostgreSQL
 ```
 
-## Definition of done for Sprint 1B
+- `app/`: Next.js customer dashboard and same-origin API gateway routes
+- `services/core-api/`: FastAPI accounts, transfers, ledger, health, metrics, and OpenAPI
+- `services/core-api/migrations/`: versioned PostgreSQL schema
+- `tests/`: web application contract tests
+- `docs/developer-handoff.md`: complete runtime and operational contract
 
-- Double-entry ledger stored in PostgreSQL
-- Atomic and idempotent transfers
-- REST API with validation and health endpoints
-- Redis-backed request throttling
-- Database migrations and automated API tests
-- Docker Compose starts the complete local platform
+## Developer validation
+
+Web:
+
+```bash
+pnpm install --frozen-lockfile
+pnpm test
+pnpm lint
+pnpm build
+```
+
+Core API:
+
+```bash
+cd services/core-api
+python -m venv .venv
+source .venv/bin/activate
+pip install -e '.[dev]'
+ruff check .
+pytest
+```
+
+Database migration and synthetic seed:
+
+```bash
+alembic upgrade head
+python -m scripts.seed
+```
+
+See `docs/developer-handoff.md` before packaging or deploying the application. It documents
+ports, commands, variables, dependencies, probes, metrics, logging, migration behavior, and
+known limitations without performing platform-engineering work for you.

@@ -58,6 +58,16 @@ alembic upgrade head
 python -m scripts.seed
 ```
 
+## Continuous integration
+
+GitHub Actions validates the web application, core API, production container images, and Docker
+Compose model for every pull request targeting `main`. The workflow uses least-privilege token
+permissions, immutable action pins, dependency caching, job timeouts, and concurrency controls.
+
+See [`docs/continuous-integration.md`](docs/continuous-integration.md) for the quality gates,
+local equivalents, failure-investigation process, branch-protection recommendations, and
+interview discussion topics.
+
 See `docs/developer-handoff.md` before packaging or deploying the application. It documents
 ports, commands, variables, dependencies, probes, metrics, logging, migration behavior, and
 known limitations without performing platform-engineering work for you.

@@ -1,8 +1,9 @@
 # Continuous integration
 
 Northstar Bank uses GitHub Actions to validate every change before it can be considered for
-merge. The workflow is defined in `.github/workflows/ci.yaml` and intentionally separates web,
-API, container, and Compose checks so failures are isolated and jobs can run in parallel.
+merge. The workflow is defined in `.github/workflows/ci.yaml` and separates web, API, container,
+and Compose checks so failures are isolated. On `main`, the container job also publishes the
+validated web and API images to private Amazon ECR repositories.
 
 ## Trigger and permission model
 
@@ -12,10 +13,12 @@ The workflow runs for:
 - pushes to `main`, which verifies the final merged commit; and
 - manual dispatches, which support troubleshooting and controlled re-runs.
 
-The workflow-level `GITHUB_TOKEN` permission is limited to `contents: read`. Validation jobs do
-not need permission to modify source, packages, pull requests, or deployments. Concurrent runs
-for the same pull request or branch are grouped, and older in-progress runs are cancelled when a
-new commit arrives.
+The workflow-level `GITHUB_TOKEN` permission is limited to `contents: read`. The container job
+adds `id-token: write` so GitHub can issue an OIDC identity token; this permission does not itself
+grant AWS access. AWS validates the token against the IAM role trust policy and returns temporary
+credentials only for the protected `main` branch. Concurrent runs for the same pull request or
+branch are grouped. Older pull-request runs are cancelled when a new commit arrives, while a
+`main` publishing run is allowed to finish so a newer merge cannot interrupt an image push.
 
 ## Quality gates
 
@@ -23,12 +26,26 @@ new commit arrives.
 | --- | --- | --- |
 | Web quality gates | The frontend installs reproducibly, passes tests and lint, and produces a production build. | `pnpm install --frozen-lockfile`, `pnpm test`, `pnpm lint`, `pnpm build` |
 | API quality gates | The Python service installs, passes static analysis, and passes its automated tests. | `python -m pip install -e '.[dev]'`, `ruff check .`, `pytest` |
-| Container builds | Both production Dockerfiles can produce images from a clean runner. | `docker build` for the web and core API contexts |
+| Container builds | Both production Dockerfiles can produce images from a clean runner; successful `main` builds are published to ECR. | `docker build` on pull requests; BuildKit build and push on `main` |
 | Compose validation | The Compose file resolves to a valid application model. | `docker compose config --quiet` |
 
 The Docker job uses a matrix. A matrix applies the same job definition to multiple parameter
-sets, reducing duplication while GitHub runs each image build as a separate job. `fail-fast` is
-disabled so one failed image does not hide the result of the other image.
+sets, reducing duplication while GitHub runs each image build as a separate job. It waits for the
+web, API, and Compose jobs. Pull requests build without AWS access; pushes to `main` assume a
+restricted IAM role, authenticate to ECR, and publish each image as `sha-<full-commit>`. `fail-fast`
+is disabled so one failed image does not hide the result of the other image.
+
+## Private image publishing
+
+The repository must define the GitHub Actions variables `AWS_ROLE_ARN` and `AWS_REGION`. The IAM
+role trusts GitHub's OIDC provider only for `Oheneali22/northstar-bank` on `main` and currently uses
+the AWS-managed `AmazonEC2ContainerRegistryPowerUser` policy. No long-lived AWS access key is
+stored in GitHub. Before production use, replace the broad managed policy with a customer-managed
+policy scoped to the `northstar-web` and `northstar-core-api` repositories and required push actions.
+
+ECR repositories use immutable tags. The workflow therefore publishes only traceable tags such as
+`sha-012345...`; it does not publish `latest`. A later deployment workflow must receive or resolve
+an exact image tag and deploy that same artifact without rebuilding it.
 
 ## Reproducibility and supply-chain controls
 
@@ -97,6 +114,6 @@ Be prepared to explain:
 - why jobs are independent instead of one long shell script;
 - the difference between dependency caching and build artifacts;
 - why full action SHAs are safer than mutable version tags;
-- why CI receives read-only permissions while a later release workflow will need package write
-  access; and
+- why pull-request builds receive no AWS credentials while `main` uses OIDC and a restricted IAM
+  role to publish; and
 - why a successful image build is useful but does not replace integration or runtime tests.

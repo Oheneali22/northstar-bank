@@ -12,7 +12,7 @@ permissions:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   NODE_VERSION: "22"
@@ -85,8 +85,13 @@ jobs:
 
   docker:
     name: Build ${{ matrix.name }} image
+    needs: [web, api, compose]
     runs-on: ubuntu-latest
     timeout-minutes: 20
+
+    permissions:
+      contents: read
+      id-token: write
 
     strategy:
       fail-fast: false
@@ -95,22 +100,46 @@ jobs:
           - name: web
             context: .
             dockerfile: Dockerfile
-            image: northstar-web:ci
+            image: northstar-web
           - name: core-api
             context: services/core-api
             dockerfile: services/core-api/Dockerfile
-            image: northstar-core-api:ci
+            image: northstar-core-api
 
     steps:
       - name: Check out repository
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
-      - name: Build image
+      - name: Build validation image
+        if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
         run: >-
           docker build
           --file "${{ matrix.dockerfile }}"
-          --tag "${{ matrix.image }}"
+          --tag "${{ matrix.image }}:ci"
           "${{ matrix.context }}"
+
+      - name: Configure temporary AWS credentials
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: aws-actions/configure-aws-credentials@acca2b1b2070338fb9fd1ca27ecee81d687e58e5 # v6.1.2
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Log in to Amazon ECR
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@d539f0932e70871a027e9d5a9d8fc38589180a64 # v2.1.6
+
+      - name: Build and publish immutable image
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: ${{ steps.ecr.outputs.registry }}/${{ matrix.image }}:sha-${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
 
   compose:
     name: Validate Compose configuration

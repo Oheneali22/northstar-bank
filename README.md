@@ -61,8 +61,10 @@ python -m scripts.seed
 ## Continuous integration
 
 GitHub Actions validates the web application, core API, production container images, and Docker
-Compose model for every pull request targeting `main`. The workflow uses least-privilege token
-permissions, immutable action pins, dependency caching, job timeouts, and concurrency controls.
+Compose model for every pull request targeting `main`. After a successful merge, the same workflow
+uses GitHub OIDC and temporary AWS credentials to publish immutable, commit-tagged images to private
+Amazon ECR repositories. The workflow uses least-privilege job permissions, immutable action pins,
+dependency caching, job timeouts, and concurrency controls.
 
 See [`docs/continuous-integration.md`](docs/continuous-integration.md) for the quality gates,
 local equivalents, failure-investigation process, branch-protection recommendations, and

@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: northstar-config
+  namespace: northstar
+  labels:
+    app.kubernetes.io/name: northstar-bank
+data:
+  APP_ENV: kubernetes
+  LOG_LEVEL: INFO
+  CORS_ORIGINS: http://localhost:3000
+  CORE_API_URL: http://northstar-core-api:8000

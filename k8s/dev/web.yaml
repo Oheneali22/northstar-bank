@@ -37,7 +37,7 @@ spec:
     spec:
       containers:
         - name: web
-          image: 942909611186.dkr.ecr.us-east-1.amazonaws.com/northstar-web:sha-ad99e0b2b1e5e07bdebd4a0cc88eb0a31d8d0450
+          image: 942909611186.dkr.ecr.us-east-1.amazonaws.com/northstar-web:sha-ab9139e03ab07551d0a62c946e5f18e1f1985a5d
           imagePullPolicy: IfNotPresent
           ports:
             - name: http

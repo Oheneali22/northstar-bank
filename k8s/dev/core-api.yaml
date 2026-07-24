@@ -24,7 +24,12 @@ metadata:
     app.kubernetes.io/name: northstar-bank
     app.kubernetes.io/component: core-api
 spec:
-  replicas: 1
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   selector:
     matchLabels:
       app.kubernetes.io/name: northstar-bank
@@ -35,9 +40,17 @@ spec:
         app.kubernetes.io/name: northstar-bank
         app.kubernetes.io/component: core-api
     spec:
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: northstar-bank
+              app.kubernetes.io/component: core-api
       initContainers:
         - name: migrate
-          image: 942909611186.dkr.ecr.us-east-1.amazonaws.com/northstar-core-api:sha-ab9139e03ab07551d0a62c946e5f18e1f1985a5d
+          image: 942909611186.dkr.ecr.us-east-1.amazonaws.com/northstar-core-api:sha-e2908c8bb7097d26c8af22c988ed214144d9d8e4
           imagePullPolicy: IfNotPresent
           command: ["sh", "-c", "until alembic upgrade head; do echo waiting for database; sleep 3; done"]
           envFrom:
@@ -46,7 +59,7 @@ spec:
             - secretRef:
                 name: northstar-database
         - name: seed
-          image: 942909611186.dkr.ecr.us-east-1.amazonaws.com/northstar-core-api:sha-ab9139e03ab07551d0a62c946e5f18e1f1985a5d
+          image: 942909611186.dkr.ecr.us-east-1.amazonaws.com/northstar-core-api:sha-e2908c8bb7097d26c8af22c988ed214144d9d8e4
           imagePullPolicy: IfNotPresent
           command: ["python", "-m", "scripts.seed"]
           envFrom:
@@ -56,7 +69,7 @@ spec:
                 name: northstar-database
       containers:
         - name: core-api
-          image: 942909611186.dkr.ecr.us-east-1.amazonaws.com/northstar-core-api:sha-ab9139e03ab07551d0a62c946e5f18e1f1985a5d
+          image: 942909611186.dkr.ecr.us-east-1.amazonaws.com/northstar-core-api:sha-e2908c8bb7097d26c8af22c988ed214144d9d8e4
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -92,3 +105,18 @@ spec:
             limits:
               cpu: 500m
               memory: 512Mi
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: northstar-core-api
+  namespace: northstar
+  labels:
+    app.kubernetes.io/name: northstar-bank
+    app.kubernetes.io/component: core-api
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: northstar-bank
+      app.kubernetes.io/component: core-api

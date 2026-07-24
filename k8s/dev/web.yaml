@@ -24,7 +24,12 @@ metadata:
     app.kubernetes.io/name: northstar-bank
     app.kubernetes.io/component: web
 spec:
-  replicas: 1
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   selector:
     matchLabels:
       app.kubernetes.io/name: northstar-bank
@@ -35,6 +40,14 @@ spec:
         app.kubernetes.io/name: northstar-bank
         app.kubernetes.io/component: web
     spec:
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: northstar-bank
+              app.kubernetes.io/component: web
       containers:
         - name: web
           image: 942909611186.dkr.ecr.us-east-1.amazonaws.com/northstar-web:sha-ad99e0b2b1e5e07bdebd4a0cc88eb0a31d8d0450
@@ -71,3 +84,18 @@ spec:
             limits:
               cpu: 500m
               memory: 512Mi
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: northstar-web
+  namespace: northstar
+  labels:
+    app.kubernetes.io/name: northstar-bank
+    app.kubernetes.io/component: web
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: northstar-bank
+      app.kubernetes.io/component: web

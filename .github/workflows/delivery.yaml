@@ -22,6 +22,13 @@ jobs:
         with:
           ref: environment/dev
 
+      - name: Copy tested Kubernetes manifests
+        env:
+          SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          git fetch --depth=1 origin "$SOURCE_SHA"
+          git checkout "$SOURCE_SHA" -- k8s/dev
+
       - name: Update image tags
         env:
           IMAGE_TAG: sha-${{ github.event.workflow_run.head_sha }}
@@ -35,7 +42,7 @@ jobs:
 
       - name: Commit and push
         run: |
-          if git diff --quiet; then
+          if git diff --quiet && git diff --cached --quiet; then
             echo "This image version is already deployed."
             exit 0
           fi

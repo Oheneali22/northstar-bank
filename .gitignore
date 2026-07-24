@@ -51,3 +51,20 @@ __pycache__/
 .ruff_cache/
 .venv/
 *.egg-info/
+
+# terraform
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+*.tfvars
+!*.tfvars.example
+
+# Local Helm values may contain environment-specific credentials.
+**/values.local.yaml
+**/secret.local.yaml

@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: northstar
+  labels:
+    app.kubernetes.io/name: northstar-bank
+    environment: dev

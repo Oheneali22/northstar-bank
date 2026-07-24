@@ -1,0 +1,6 @@
+aws_region   = "us-east-1"
+project_name = "northstar-bank"
+environment  = "dev"
+
+# Replace this documentation-only address with your current public IP followed by /32.
+cluster_endpoint_public_access_cidrs = ["198.51.100.10/32"]

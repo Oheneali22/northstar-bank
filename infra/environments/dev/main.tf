@@ -151,8 +151,10 @@ module "eks" {
 
   eks_managed_node_groups = {
     application = {
-      ami_type       = "AL2023_x86_64_STANDARD"
-      instance_types = var.node_instance_types
+      ami_type                       = "AL2023_x86_64_STANDARD"
+      ami_release_version            = "1.35.6-20260714"
+      use_latest_ami_release_version = false
+      instance_types                 = var.node_instance_types
 
       min_size     = 2
       max_size     = 2

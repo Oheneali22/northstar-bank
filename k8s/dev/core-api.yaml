@@ -50,7 +50,7 @@ spec:
               app.kubernetes.io/component: core-api
       initContainers:
         - name: migrate
-          image: 942909611186.dkr.ecr.us-east-1.amazonaws.com/northstar-core-api:sha-e2908c8bb7097d26c8af22c988ed214144d9d8e4
+          image: 942909611186.dkr.ecr.us-east-1.amazonaws.com/northstar-core-api:sha-ad77d3ad92f0184c7e7f4480721c083faf47ad4d
           imagePullPolicy: IfNotPresent
           command: ["sh", "-c", "until alembic upgrade head; do echo waiting for database; sleep 3; done"]
           envFrom:
@@ -59,7 +59,7 @@ spec:
             - secretRef:
                 name: northstar-database
         - name: seed
-          image: 942909611186.dkr.ecr.us-east-1.amazonaws.com/northstar-core-api:sha-e2908c8bb7097d26c8af22c988ed214144d9d8e4
+          image: 942909611186.dkr.ecr.us-east-1.amazonaws.com/northstar-core-api:sha-ad77d3ad92f0184c7e7f4480721c083faf47ad4d
           imagePullPolicy: IfNotPresent
           command: ["python", "-m", "scripts.seed"]
           envFrom:
@@ -69,7 +69,7 @@ spec:
                 name: northstar-database
       containers:
         - name: core-api
-          image: 942909611186.dkr.ecr.us-east-1.amazonaws.com/northstar-core-api:sha-e2908c8bb7097d26c8af22c988ed214144d9d8e4
+          image: 942909611186.dkr.ecr.us-east-1.amazonaws.com/northstar-core-api:sha-ad77d3ad92f0184c7e7f4480721c083faf47ad4d
           imagePullPolicy: IfNotPresent
           ports:
             - name: http

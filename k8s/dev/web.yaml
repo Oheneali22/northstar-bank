@@ -50,7 +50,7 @@ spec:
               app.kubernetes.io/component: web
       containers:
         - name: web
-          image: 942909611186.dkr.ecr.us-east-1.amazonaws.com/northstar-web:sha-ad77d3ad92f0184c7e7f4480721c083faf47ad4d
+          image: 942909611186.dkr.ecr.us-east-1.amazonaws.com/northstar-web:sha-bdf60581c3789852151d5ca8427062f89c595ae6
           imagePullPolicy: IfNotPresent
           ports:
             - name: http

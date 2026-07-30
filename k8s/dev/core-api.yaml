@@ -39,6 +39,10 @@ spec:
       labels:
         app.kubernetes.io/name: northstar-bank
         app.kubernetes.io/component: core-api
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /metrics
+        prometheus.io/port: "8000"
     spec:
       topologySpreadConstraints:
         - maxSkew: 1
@@ -50,7 +54,7 @@ spec:
               app.kubernetes.io/component: core-api
       initContainers:
         - name: migrate
-          image: 942909611186.dkr.ecr.us-east-1.amazonaws.com/northstar-core-api:sha-bdf60581c3789852151d5ca8427062f89c595ae6
+          image: 942909611186.dkr.ecr.us-east-1.amazonaws.com/northstar-core-api:sha-c4228d14012eac1c61aeab42f36669c23d84621b
           imagePullPolicy: IfNotPresent
           command: ["sh", "-c", "until alembic upgrade head; do echo waiting for database; sleep 3; done"]
           envFrom:
@@ -59,7 +63,7 @@ spec:
             - secretRef:
                 name: northstar-database
         - name: seed
-          image: 942909611186.dkr.ecr.us-east-1.amazonaws.com/northstar-core-api:sha-bdf60581c3789852151d5ca8427062f89c595ae6
+          image: 942909611186.dkr.ecr.us-east-1.amazonaws.com/northstar-core-api:sha-c4228d14012eac1c61aeab42f36669c23d84621b
           imagePullPolicy: IfNotPresent
           command: ["python", "-m", "scripts.seed"]
           envFrom:
@@ -69,7 +73,7 @@ spec:
                 name: northstar-database
       containers:
         - name: core-api
-          image: 942909611186.dkr.ecr.us-east-1.amazonaws.com/northstar-core-api:sha-bdf60581c3789852151d5ca8427062f89c595ae6
+          image: 942909611186.dkr.ecr.us-east-1.amazonaws.com/northstar-core-api:sha-c4228d14012eac1c61aeab42f36669c23d84621b
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
